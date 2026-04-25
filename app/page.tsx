@@ -40,37 +40,38 @@ export default function Home() {
   const [architect, setArchitect] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [rating, setRating] = useState(3)
+
   const [selectedCategory, setSelectedCategory] = useState('')
   const [searchText, setSearchText] = useState('')
   const [sortType, setSortType] = useState('newest')
 
-  const filteredPlaces = places
-  .filter((place) => {
-    if (!selectedCategory) return true
-    return place.category === selectedCategory
-  })
-  .filter((place) => {
-    if (!searchText) return true
+  const filteredPlaces = [...places]
+    .filter((place) => {
+      if (!selectedCategory) return true
+      return place.category === selectedCategory
+    })
+    .filter((place) => {
+      if (!searchText) return true
 
-    const text = searchText.toLowerCase()
+      const text = searchText.toLowerCase()
 
-    return (
-      place.title?.toLowerCase().includes(text) ||
-      place.memo?.toLowerCase().includes(text) ||
-      place.architect?.toLowerCase().includes(text)
-    )
-  })
-  .sort((a, b) => {
-    if (sortType === 'rating') {
-      return (b.rating || 0) - (a.rating || 0)
-    }
+      return (
+        place.title?.toLowerCase().includes(text) ||
+        place.memo?.toLowerCase().includes(text) ||
+        place.architect?.toLowerCase().includes(text)
+      )
+    })
+    .sort((a, b) => {
+      if (sortType === 'rating') {
+        return (b.rating || 0) - (a.rating || 0)
+      }
 
-    if (sortType === 'era') {
-      return (a.era || '').localeCompare(b.era || '')
-    }
+      if (sortType === 'era') {
+        return (a.era || '').localeCompare(b.era || '')
+      }
 
-    return 0
-  })
+      return 0
+    })
 
   const createPopupHtml = (place: Place) => {
     return `
@@ -151,7 +152,7 @@ export default function Home() {
         return
       }
 
-      setPlaces(data)
+      setPlaces(data || [])
     }
 
     loadPlaces()
@@ -200,7 +201,7 @@ export default function Home() {
     filteredPlaces.forEach((place) => {
       addMarker(place)
     })
-  }, [places, selectedCategory])
+  }, [places, selectedCategory, searchText, sortType])
 
   const uploadImage = async () => {
     if (!imageFile) return ''
@@ -289,212 +290,233 @@ export default function Home() {
   }
 
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100vh' }}>
-      <div
-        style={{
-          width: '360px',
-          padding: '16px',
-          borderRight: '1px solid #ddd',
-          background: '#fff',
-          overflowY: 'auto',
-        }}
-      >
-        <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>
-  My Map
-</h1>
+    <>
+      <div className="app-layout">
+        <div className="side-panel">
+          <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>
+            My Map
+          </h1>
 
-{/* 🔍 検索 */}
-<input
-  value={searchText}
-  onChange={(e) => setSearchText(e.target.value)}
-  placeholder="場所名・メモ・建築家で検索"
-  style={inputStyle}
-/>
+          <input
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="場所名・メモ・建築家で検索"
+            style={inputStyle}
+          />
 
-{/* 🔽 並び替え */}
-<select
-  value={sortType}
-  onChange={(e) => setSortType(e.target.value)}
-  style={inputStyle}
->
-  <option value="newest">新しい順</option>
-  <option value="rating">評価が高い順</option>
-  <option value="era">年代順</option>
-</select>
-
-{/* 🏷 カテゴリ */}
-<select
-  value={selectedCategory}
-  onChange={(e) => setSelectedCategory(e.target.value)}
-  style={inputStyle}
->
-          <option value="">すべて表示</option>
-          <option value="建築">建築</option>
-          <option value="都市構造">都市構造</option>
-          <option value="カフェ">カフェ</option>
-          <option value="公園">公園</option>
-          <option value="産業遺産">産業遺産</option>
-          <option value="ショップ">ショップ</option>
-          <option value="イベント">イベント</option>
-          <option value="その他">その他</option>
-        </select>
-
-        {selectedPoint && (
-          <div
-            style={{
-              padding: '12px',
-              marginBottom: '16px',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              background: '#fafafa',
-            }}
+          <select
+            value={sortType}
+            onChange={(e) => setSortType(e.target.value)}
+            style={inputStyle}
           >
-            <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
-              新しい場所を追加
-            </h2>
+            <option value="newest">新しい順</option>
+            <option value="rating">評価が高い順</option>
+            <option value="era">年代順</option>
+          </select>
 
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="場所名"
-              style={inputStyle}
-            />
-
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              style={inputStyle}
-            >
-              <option value="">カテゴリー選択</option>
-              <option value="建築">建築</option>
-              <option value="都市構造">都市構造</option>
-              <option value="カフェ">カフェ</option>
-              <option value="公園">公園</option>
-              <option value="産業遺産">産業遺産</option>
-              <option value="ショップ">ショップ</option>
-              <option value="イベント">イベント</option>
-              <option value="その他">その他</option>
-            </select>
-
-            <input
-              value={era}
-              onChange={(e) => setEra(e.target.value)}
-              placeholder="年代（例：1960年代）"
-              style={inputStyle}
-            />
-
-            <input
-              value={architect}
-              onChange={(e) => setArchitect(e.target.value)}
-              placeholder="建築家 / 設計者"
-              style={inputStyle}
-            />
-
-            <textarea
-              value={memo}
-              onChange={(e) => setMemo(e.target.value)}
-              placeholder="メモ・社会背景・環境メモ"
-              rows={4}
-              style={inputStyle}
-            />
-
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-              style={inputStyle}
-            />
-
-            <select
-              value={rating}
-              onChange={(e) => setRating(Number(e.target.value))}
-              style={inputStyle}
-            >
-              <option value={1}>★1</option>
-              <option value={2}>★2</option>
-              <option value={3}>★3</option>
-              <option value={4}>★4</option>
-              <option value={5}>★5</option>
-            </select>
-
-            <button onClick={savePlace} style={saveButtonStyle}>
-              保存
-            </button>
-
-            <button onClick={cancelForm} style={cancelButtonStyle}>
-              キャンセル
-            </button>
-          </div>
-        )}
-
-        {filteredPlaces.length === 0 && (
-          <p style={{ color: '#666' }}>まだピンがありません</p>
-        )}
-
-                {filteredPlaces.map((place) => (
-          <div
-            key={place.id}
-            onClick={() => moveToPlace(place)}
-            style={{
-              width: '100%',
-              marginBottom: '16px',
-              border: '1px solid #e5e5e5',
-              borderRadius: '16px',
-              background: '#fff',
-              overflow: 'hidden',
-              cursor: 'pointer',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-            }}
+          <select
+            value={selectedCategory}
+            onChange={(e) => setSelectedCategory(e.target.value)}
+            style={inputStyle}
           >
-            {place.image_url && (
-              <img
-                src={place.image_url}
-                alt={place.title}
-                style={{
-                  width: '100%',
-                  height: '200px',
-                  objectFit: 'cover',
-                  display: 'block',
-                }}
+            <option value="">すべて表示</option>
+            <option value="建築">建築</option>
+            <option value="都市構造">都市構造</option>
+            <option value="カフェ">カフェ</option>
+            <option value="公園">公園</option>
+            <option value="産業遺産">産業遺産</option>
+            <option value="ショップ">ショップ</option>
+            <option value="イベント">イベント</option>
+            <option value="その他">その他</option>
+          </select>
+
+          {selectedPoint && (
+            <div style={formBoxStyle}>
+              <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '8px' }}>
+                新しい場所を追加
+              </h2>
+
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="場所名"
+                style={inputStyle}
               />
-            )}
 
-            <div style={{ padding: '12px' }}>
-              <strong style={{ fontSize: '16px' }}>📍 {place.title}</strong>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                style={inputStyle}
+              >
+                <option value="">カテゴリー選択</option>
+                <option value="建築">建築</option>
+                <option value="都市構造">都市構造</option>
+                <option value="カフェ">カフェ</option>
+                <option value="公園">公園</option>
+                <option value="産業遺産">産業遺産</option>
+                <option value="ショップ">ショップ</option>
+                <option value="イベント">イベント</option>
+                <option value="その他">その他</option>
+              </select>
 
-              <div style={{ marginTop: '8px' }}>
-                {place.category && <span style={tagStyle}>{place.category}</span>}
-                {place.era && <span style={tagStyle}>{place.era}</span>}
-                {place.rating && <span style={tagStyle}>{'★'.repeat(place.rating)}</span>}
-              </div>
+              <input
+                value={era}
+                onChange={(e) => setEra(e.target.value)}
+                placeholder="年代（例：1960年代）"
+                style={inputStyle}
+              />
 
-              {place.architect && (
-                <p style={smallTextStyle}>設計者：{place.architect}</p>
-              )}
+              <input
+                value={architect}
+                onChange={(e) => setArchitect(e.target.value)}
+                placeholder="建築家 / 設計者"
+                style={inputStyle}
+              />
 
-              {place.memo && (
-                <p style={{ ...smallTextStyle, lineHeight: '1.5' }}>
-                  {place.memo}
-                </p>
-              )}
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                placeholder="メモ・社会背景・環境メモ"
+                rows={4}
+                style={inputStyle}
+              />
+
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                style={inputStyle}
+              />
+
+              <select
+                value={rating}
+                onChange={(e) => setRating(Number(e.target.value))}
+                style={inputStyle}
+              >
+                <option value={1}>★1</option>
+                <option value={2}>★2</option>
+                <option value={3}>★3</option>
+                <option value={4}>★4</option>
+                <option value={5}>★5</option>
+              </select>
+
+              <button onClick={savePlace} style={saveButtonStyle}>
+                保存
+              </button>
+
+              <button onClick={cancelForm} style={cancelButtonStyle}>
+                キャンセル
+              </button>
             </div>
-          </div>
-        ))}
+          )}
+
+          {filteredPlaces.length === 0 && (
+            <p style={{ color: '#666' }}>まだピンがありません</p>
+          )}
+
+          {filteredPlaces.map((place) => (
+            <div
+              key={place.id}
+              onClick={() => moveToPlace(place)}
+              style={cardStyle}
+            >
+              {place.image_url && (
+                <img
+                  src={place.image_url}
+                  alt={place.title}
+                  style={cardImageStyle}
+                />
+              )}
+
+              <div style={{ padding: '12px' }}>
+                <strong style={{ fontSize: '16px' }}>📍 {place.title}</strong>
+
+                <div style={{ marginTop: '8px' }}>
+                  {place.category && <span style={tagStyle}>{place.category}</span>}
+                  {place.era && <span style={tagStyle}>{place.era}</span>}
+                  {place.rating && <span style={tagStyle}>{'★'.repeat(place.rating)}</span>}
+                </div>
+
+                {place.architect && (
+                  <p style={smallTextStyle}>設計者：{place.architect}</p>
+                )}
+
+                {place.memo && (
+                  <p style={{ ...smallTextStyle, lineHeight: '1.5' }}>
+                    {place.memo}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div ref={mapContainer} className="map-area" />
       </div>
 
-      <div
-        ref={mapContainer}
-        style={{ flex: 1, height: '100vh' }}
-      />
-    </div>
+      <style jsx global>{`
+        .app-layout {
+          display: flex;
+          width: 100vw;
+          height: 100vh;
+        }
+
+        .side-panel {
+          width: 360px;
+          padding: 16px;
+          border-right: 1px solid #ddd;
+          background: #fff;
+          overflow-y: auto;
+          box-sizing: border-box;
+        }
+
+        .map-area {
+          flex: 1;
+          height: 100vh;
+        }
+
+        @media (max-width: 600px) and (pointer: coarse) {
+          .app-layout {
+            flex-direction: column;
+            height: 100dvh;
+          }
+
+          .map-area {
+            order: 1;
+            width: 100%;
+            height: 45dvh;
+            flex: none;
+          }
+
+          .side-panel {
+            order: 2;
+            width: 100%;
+            height: 55dvh;
+            border-right: none;
+            border-top: 1px solid #ddd;
+            overflow-y: auto;
+          }
+        }
+      `}</style>
+    </>
   )
 }
+
 const inputStyle = {
   width: '100%',
   padding: '8px',
   marginBottom: '8px',
   border: '1px solid #ccc',
   borderRadius: '6px',
+  boxSizing: 'border-box' as const,
+}
+
+const formBoxStyle = {
+  padding: '12px',
+  marginBottom: '16px',
+  border: '1px solid #ddd',
+  borderRadius: '8px',
+  background: '#fafafa',
 }
 
 const saveButtonStyle = {
@@ -532,4 +554,22 @@ const tagStyle = {
   background: '#f1f1f1',
   color: '#333',
   fontSize: '12px',
+}
+
+const cardStyle = {
+  width: '100%',
+  marginBottom: '16px',
+  border: '1px solid #e5e5e5',
+  borderRadius: '16px',
+  background: '#fff',
+  overflow: 'hidden',
+  cursor: 'pointer',
+  boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+}
+
+const cardImageStyle = {
+  width: '100%',
+  height: '200px',
+  objectFit: 'cover' as const,
+  display: 'block',
 }
