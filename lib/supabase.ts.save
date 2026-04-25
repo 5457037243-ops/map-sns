@@ -1,0 +1,16 @@
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = 'ここにProject URL'
+const supabaseKey = 'ここにPublishable key'
+
+export const supabase = createClient(supabaseUrl, supabaseKey)
+import { createClient } from '@supabase/supabase-js'
+
+const supabaseUrl = 
+'https://sonvhbbvhfixwacoyahd.supabase.co/rest/v1/'
+const supabaseKey = 
+'sb_publishable_39oUmJbEFEpaksdSoren9w_r9TEVFLb'
+
+export const supabase = createClient(supabaseUrl, supabaseKey)
+
+
