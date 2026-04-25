@@ -28,6 +28,7 @@ type SelectedPoint = {
 export default function Home() {
   const mapContainer = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<mapboxgl.Map | null>(null)
+  const markersRef = useRef<mapboxgl.Marker[]>([])
 
   const [places, setPlaces] = useState<Place[]>([])
   const [selectedPoint, setSelectedPoint] = useState<SelectedPoint | null>(null)
@@ -39,6 +40,93 @@ export default function Home() {
   const [architect, setArchitect] = useState('')
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [rating, setRating] = useState(3)
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [searchText, setSearchText] = useState('')
+  const [sortType, setSortType] = useState('newest')
+
+  const filteredPlaces = places
+  .filter((place) => {
+    if (!selectedCategory) return true
+    return place.category === selectedCategory
+  })
+  .filter((place) => {
+    if (!searchText) return true
+
+    const text = searchText.toLowerCase()
+
+    return (
+      place.title?.toLowerCase().includes(text) ||
+      place.memo?.toLowerCase().includes(text) ||
+      place.architect?.toLowerCase().includes(text)
+    )
+  })
+  .sort((a, b) => {
+    if (sortType === 'rating') {
+      return (b.rating || 0) - (a.rating || 0)
+    }
+
+    if (sortType === 'era') {
+      return (a.era || '').localeCompare(b.era || '')
+    }
+
+    return 0
+  })
+
+  const createPopupHtml = (place: Place) => {
+    return `
+      <div style="max-width: 220px;">
+        ${place.image_url ? `<img src="${place.image_url}" style="width:100%; border-radius:8px; margin-bottom:8px;" />` : ''}
+        <strong>${place.title}</strong>
+        ${place.category ? `<p>カテゴリー：${place.category}</p>` : ''}
+        ${place.era ? `<p>年代：${place.era}</p>` : ''}
+        ${place.architect ? `<p>設計者：${place.architect}</p>` : ''}
+        ${place.rating ? `<p>評価：${'★'.repeat(place.rating)}</p>` : ''}
+        ${place.memo ? `<p>${place.memo}</p>` : ''}
+      </div>
+    `
+  }
+
+  const addMarker = (place: Place) => {
+    const map = mapRef.current
+    if (!map) return
+
+    const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(createPopupHtml(place))
+
+    const marker = new mapboxgl.Marker()
+      .setLngLat([place.longitude, place.latitude])
+      .setPopup(popup)
+      .addTo(map)
+
+    markersRef.current.push(marker)
+
+    marker.getElement().addEventListener('click', (ev) => {
+      ev.stopPropagation()
+      marker.togglePopup()
+    })
+
+    marker.getElement().addEventListener('dblclick', async (ev) => {
+      ev.stopPropagation()
+
+      const ok = window.confirm('このピンを削除しますか？')
+      if (!ok) return
+
+      const { error } = await supabase
+        .from('places')
+        .delete()
+        .eq('id', place.id)
+
+      if (error) {
+        alert(`削除に失敗しました: ${error.message}`)
+        return
+      }
+
+      marker.remove()
+      markersRef.current = markersRef.current.filter((m) => m !== marker)
+      setPlaces((currentPlaces) =>
+        currentPlaces.filter((p) => p.id !== place.id)
+      )
+    })
+  }
 
   useEffect(() => {
     if (!mapContainer.current) return
@@ -52,54 +140,6 @@ export default function Home() {
 
     mapRef.current = map
 
-    const addMarker = (place: Place) => {
-      const popupHtml = `
-        <div style="max-width: 220px;">
-          ${place.image_url ? `<img src="${place.image_url}" style="width:100%; border-radius:8px; margin-bottom:8px;" />` : ''}
-          <strong>${place.title}</strong>
-          ${place.category ? `<p>カテゴリー：${place.category}</p>` : ''}
-          ${place.era ? `<p>年代：${place.era}</p>` : ''}
-          ${place.architect ? `<p>設計者：${place.architect}</p>` : ''}
-          ${place.rating ? `<p>評価：${'★'.repeat(place.rating)}</p>` : ''}
-          ${place.memo ? `<p>${place.memo}</p>` : ''}
-        </div>
-      `
-
-      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml)
-
-      const marker = new mapboxgl.Marker()
-        .setLngLat([place.longitude, place.latitude])
-        .setPopup(popup)
-        .addTo(map)
-
-      marker.getElement().addEventListener('click', (ev) => {
-        ev.stopPropagation()
-        marker.togglePopup()
-      })
-
-      marker.getElement().addEventListener('dblclick', async (ev) => {
-        ev.stopPropagation()
-
-        const ok = window.confirm('このピンを削除しますか？')
-        if (!ok) return
-
-        const { error } = await supabase
-          .from('places')
-          .delete()
-          .eq('id', place.id)
-
-        if (error) {
-          alert(`削除に失敗しました: ${error.message}`)
-          return
-        }
-
-        marker.remove()
-        setPlaces((currentPlaces) =>
-          currentPlaces.filter((p) => p.id !== place.id)
-        )
-      })
-    }
-
     const loadPlaces = async () => {
       const { data, error } = await supabase
         .from('places')
@@ -112,7 +152,6 @@ export default function Home() {
       }
 
       setPlaces(data)
-      data.forEach((place) => addMarker(place))
     }
 
     loadPlaces()
@@ -145,9 +184,23 @@ export default function Home() {
     })
 
     return () => {
+      markersRef.current.forEach((marker) => marker.remove())
+      markersRef.current = []
       map.remove()
     }
   }, [])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+
+    markersRef.current.forEach((marker) => marker.remove())
+    markersRef.current = []
+
+    filteredPlaces.forEach((place) => {
+      addMarker(place)
+    })
+  }, [places, selectedCategory])
 
   const uploadImage = async () => {
     if (!imageFile) return ''
@@ -207,28 +260,6 @@ export default function Home() {
 
     setPlaces((currentPlaces) => [data, ...currentPlaces])
 
-    const map = mapRef.current
-    if (map) {
-      const popupHtml = `
-        <div style="max-width: 220px;">
-          ${data.image_url ? `<img src="${data.image_url}" style="width:100%; border-radius:8px; margin-bottom:8px;" />` : ''}
-          <strong>${data.title}</strong>
-          ${data.category ? `<p>カテゴリー：${data.category}</p>` : ''}
-          ${data.era ? `<p>年代：${data.era}</p>` : ''}
-          ${data.architect ? `<p>設計者：${data.architect}</p>` : ''}
-          ${data.rating ? `<p>評価：${'★'.repeat(data.rating)}</p>` : ''}
-          ${data.memo ? `<p>${data.memo}</p>` : ''}
-        </div>
-      `
-
-      const popup = new mapboxgl.Popup({ offset: 25 }).setHTML(popupHtml)
-
-      new mapboxgl.Marker()
-        .setLngLat([data.longitude, data.latitude])
-        .setPopup(popup)
-        .addTo(map)
-    }
-
     setSelectedPoint(null)
     setTitle('')
     setMemo('')
@@ -269,8 +300,44 @@ export default function Home() {
         }}
       >
         <h1 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>
-          My Map
-        </h1>
+  My Map
+</h1>
+
+{/* 🔍 検索 */}
+<input
+  value={searchText}
+  onChange={(e) => setSearchText(e.target.value)}
+  placeholder="場所名・メモ・建築家で検索"
+  style={inputStyle}
+/>
+
+{/* 🔽 並び替え */}
+<select
+  value={sortType}
+  onChange={(e) => setSortType(e.target.value)}
+  style={inputStyle}
+>
+  <option value="newest">新しい順</option>
+  <option value="rating">評価が高い順</option>
+  <option value="era">年代順</option>
+</select>
+
+{/* 🏷 カテゴリ */}
+<select
+  value={selectedCategory}
+  onChange={(e) => setSelectedCategory(e.target.value)}
+  style={inputStyle}
+>
+          <option value="">すべて表示</option>
+          <option value="建築">建築</option>
+          <option value="都市構造">都市構造</option>
+          <option value="カフェ">カフェ</option>
+          <option value="公園">公園</option>
+          <option value="産業遺産">産業遺産</option>
+          <option value="ショップ">ショップ</option>
+          <option value="イベント">イベント</option>
+          <option value="その他">その他</option>
+        </select>
 
         {selectedPoint && (
           <div
@@ -360,24 +427,23 @@ export default function Home() {
           </div>
         )}
 
-        {places.length === 0 && (
+        {filteredPlaces.length === 0 && (
           <p style={{ color: '#666' }}>まだピンがありません</p>
         )}
 
-        {places.map((place) => (
-          <button
+                {filteredPlaces.map((place) => (
+          <div
             key={place.id}
             onClick={() => moveToPlace(place)}
             style={{
-              display: 'block',
               width: '100%',
-              padding: '12px',
-              marginBottom: '8px',
-              textAlign: 'left',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              background: '#fafafa',
+              marginBottom: '16px',
+              border: '1px solid #e5e5e5',
+              borderRadius: '16px',
+              background: '#fff',
+              overflow: 'hidden',
               cursor: 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
             }}
           >
             {place.image_url && (
@@ -386,36 +452,33 @@ export default function Home() {
                 alt={place.title}
                 style={{
                   width: '100%',
-                  height: '120px',
+                  height: '200px',
                   objectFit: 'cover',
-                  borderRadius: '8px',
-                  marginBottom: '8px',
+                  display: 'block',
                 }}
               />
             )}
 
-            <strong>📍 {place.title}</strong>
+            <div style={{ padding: '12px' }}>
+              <strong style={{ fontSize: '16px' }}>📍 {place.title}</strong>
 
-            {place.category && (
-              <p style={smallTextStyle}>カテゴリー：{place.category}</p>
-            )}
+              <div style={{ marginTop: '8px' }}>
+                {place.category && <span style={tagStyle}>{place.category}</span>}
+                {place.era && <span style={tagStyle}>{place.era}</span>}
+                {place.rating && <span style={tagStyle}>{'★'.repeat(place.rating)}</span>}
+              </div>
 
-            {place.era && (
-              <p style={smallTextStyle}>年代：{place.era}</p>
-            )}
+              {place.architect && (
+                <p style={smallTextStyle}>設計者：{place.architect}</p>
+              )}
 
-            {place.architect && (
-              <p style={smallTextStyle}>設計者：{place.architect}</p>
-            )}
-
-            {place.rating && (
-              <p style={smallTextStyle}>評価：{'★'.repeat(place.rating)}</p>
-            )}
-
-            {place.memo && (
-              <p style={smallTextStyle}>{place.memo}</p>
-            )}
-          </button>
+              {place.memo && (
+                <p style={{ ...smallTextStyle, lineHeight: '1.5' }}>
+                  {place.memo}
+                </p>
+              )}
+            </div>
+          </div>
         ))}
       </div>
 
@@ -426,7 +489,6 @@ export default function Home() {
     </div>
   )
 }
-
 const inputStyle = {
   width: '100%',
   padding: '8px',
@@ -459,4 +521,15 @@ const smallTextStyle = {
   margin: '6px 0 0',
   color: '#666',
   fontSize: '13px',
+}
+
+const tagStyle = {
+  display: 'inline-block',
+  padding: '4px 8px',
+  marginRight: '6px',
+  marginBottom: '6px',
+  borderRadius: '999px',
+  background: '#f1f1f1',
+  color: '#333',
+  fontSize: '12px',
 }
